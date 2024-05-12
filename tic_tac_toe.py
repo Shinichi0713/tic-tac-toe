@@ -5,13 +5,13 @@ from itertools import cycle
 import random
 import agent
 
-# players in the game
+# 画面反映用クラス
 class Player(NamedTuple):
     label: str
     color: str
 
 
-# moves on the board
+# 番目の手を表すクラス
 class Move(NamedTuple):
     row: int
     col: int
@@ -24,6 +24,7 @@ DEFAULT_PLAYERS = (
     Player(label="O", color="red"),
 )
 
+# ゲーム画面
 class TicTacToeBoard(tk.Tk):
     def __init__(self, game):
         super().__init__()
@@ -159,8 +160,9 @@ class TicTacToeBoard(tk.Tk):
             button.config(text="")
             button.config(fg="black")
 
+# tic-tac-toeゲームを進行するクラス
 class TicTacToeGame:
-    # default setting for game
+    # コンストラクタ
     def __init__(self, players=DEFAULT_PLAYERS, board_size=BOARD_SIZE):
         self.symbol_player = [player.label for player in DEFAULT_PLAYERS]
         self._players = cycle(players)
@@ -180,6 +182,7 @@ class TicTacToeGame:
         ]
         self._winning_combos = self._get_winning_combos()
     
+    # 勝ちパターンを取得
     def _get_winning_combos(self):
         rows = [
             [(move.row, move.col) for move in row]
@@ -213,12 +216,12 @@ class TicTacToeGame:
         # プレーヤの切り替え
         self.current_player = next(self._players)
         
-    
+    # 勝者がいるかどうかを確認
     def has_winner(self):
         """Return True if the game has a winner, and False otherwise."""
         return self._has_winner
 
-    # check whether the game is tied
+    # ゲームが引き分けかどうかを確認
     def is_tied(self):
         """Return True if the game is tied, and False otherwise."""
         no_winner = not self._has_winner
@@ -228,7 +231,7 @@ class TicTacToeGame:
         result_playable = "" in moves_variation
         return no_winner and result_playable
 
-    
+    # リセット処理
     def reset_game(self):
         """Reset the game state to play again."""
         for row, row_content in enumerate(self._current_moves):
@@ -237,6 +240,7 @@ class TicTacToeGame:
         self._has_winner = False
         self.winner_combo = []
 
+    # エージェントに渡す状態空間に変換
     def get_area_movable(self):
         area_movable = []
         for row in range(3):
@@ -246,12 +250,14 @@ class TicTacToeGame:
                     area_movable.append(move)
         return area_movable
 
+    # エージェントの行動を番目に反映
     def calculate_hand(self, hand_input):
         row = hand_input // 3
         col = hand_input % 3
         move = Move(row, col, self.current_player.label)
         self.process_move(move)
 
+    # 現在の番目から状態空間を取得
     def calculate_play_area(self):
         play_area = []
         for row in range(3):
@@ -262,12 +268,14 @@ class TicTacToeGame:
                     play_area.append(self._current_moves[row][col].label)
         return play_area
 
+# ゲーム実行
 def main():
     game = TicTacToeGame()
 
     board = TicTacToeBoard(game)
     board.mainloop()
 
+# 検証用関数(メンテナンス用途)
 def try_develop():
     game = TicTacToeGame()
     print(game.current_player)
