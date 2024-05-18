@@ -37,6 +37,7 @@ class TicTacToeBoard(tk.Tk):
         # エージェント
         self.agent = agent.Agent(game)
 
+    # ゲーム画面を生成
     def _create_board_display(self):
         display_frame = tk.Frame(master=self)
         display_frame.pack(fill=tk.X)
@@ -47,6 +48,7 @@ class TicTacToeBoard(tk.Tk):
         )
         self.display.pack()
 
+    # 番目を生成
     def _create_board_grid(self):
         grid_frame = tk.Frame(master=self)
         grid_frame.pack()
@@ -73,8 +75,8 @@ class TicTacToeBoard(tk.Tk):
                     sticky="nsew"
                 )
 
+    # 実際の操作
     def play(self, event):
-        """Handle a player's move."""
         clicked_btn = event.widget
         row, col = self._cells[clicked_btn]
         move = Move(row, col, self._game.current_player.label)
@@ -94,11 +96,7 @@ class TicTacToeBoard(tk.Tk):
         # AIの手を選択
         while True:
             # 学習時のラベル対応に合わせるため反転
-            for i in range(len(playarea)):
-                if playarea[i] == self._game.symbol_player[0]:
-                    playarea[i] = self._game.symbol_player[1]
-                elif playarea[i] == self._game.symbol_player[1]:
-                    playarea[i] = self._game.symbol_player[0]
+            playarea = self._game.inverse_playarea(playarea)
             _, ql_ai_input = self.agent.get_ai_input(playarea, 1, mode=1, epsilon=0.0)
             ql_ai_input -= 1
             print(f'AIの手：{ql_ai_input}')
@@ -110,20 +108,23 @@ class TicTacToeBoard(tk.Tk):
                 button_choice = button
         self._judge_game(move_enemy, button_choice)
 
+    # 勝敗判定
     def _judge_game(self, move, clicked_btn):
         if self._game.is_valid_move(move):
             self._game.process_move(move)
             self._update_button(clicked_btn)
+            # ゲームが続いている
             if self._game.is_tied():
                 self._update_display(msg="Tied game!", color="red")
+            # 勝敗が決まった
             elif self._game.has_winner():
                 self._highlight_cells()
                 msg = f'Player "{self._game.current_player.label}" won!'
                 color = self._game.current_player.color
                 self._update_display(msg, color)
+            # 引き分け
             else:
-                self._game.toggle_player()
-                msg = f"{self._game.current_player.label}'s turn"
+                msg = "draw"
                 self._update_display(msg)
 
     def _update_button(self, clicked_btn):
@@ -152,13 +153,13 @@ class TicTacToeBoard(tk.Tk):
         menu_bar.add_cascade(label="File", menu=file_menu)
     
     def reset_board(self):
-        """Reset the game's board to play again."""
         self._game.reset_game()
         self._update_display(msg="Ready?")
         for button in self._cells.keys():
             button.config(highlightbackground="lightblue")
             button.config(text="")
             button.config(fg="black")
+
 
 # tic-tac-toeゲームを進行するクラス
 class TicTacToeGame:
@@ -169,9 +170,9 @@ class TicTacToeGame:
         self.board_size = board_size
         self.current_player = next(self._players)
         self.winner_combo = []
-        self._current_moves = []        # current moves
+        self._current_moves = []        # 現状の番目
         self._has_winner = False
-        self._winning_combos = []       # winning pattern
+        self._winning_combos = []       # 勝敗パターン
         self._setup_board()
     
     def _setup_board(self):
@@ -194,7 +195,6 @@ class TicTacToeGame:
         return rows + columns + [first_diagonal, second_diagonal]
 
     def is_valid_move(self, move):
-        """Return True if move is valid, and False otherwise."""
         row, col = move.row, move.col
         move_was_not_played = self._current_moves[row][col].label == ""
         no_winner = not self._has_winner
@@ -202,7 +202,6 @@ class TicTacToeGame:
 
     # 入力された手を処理する
     def process_move(self, move):
-        """Process the current move and check if it's a win."""
         row, col = move.row, move.col
         self._current_moves[row][col] = move
         
@@ -218,12 +217,10 @@ class TicTacToeGame:
         
     # 勝者がいるかどうかを確認
     def has_winner(self):
-        """Return True if the game has a winner, and False otherwise."""
         return self._has_winner
 
     # ゲームが引き分けかどうかを確認
     def is_tied(self):
-        """Return True if the game is tied, and False otherwise."""
         no_winner = not self._has_winner
         # 番目に隙間があるかどうかを確認する
         moves_variation = set([element.label for col in self._current_moves
@@ -233,7 +230,6 @@ class TicTacToeGame:
 
     # リセット処理
     def reset_game(self):
-        """Reset the game state to play again."""
         for row, row_content in enumerate(self._current_moves):
             for col, _ in enumerate(row_content):
                 row_content[col] = Move(row, col)
@@ -267,6 +263,18 @@ class TicTacToeGame:
                 else:
                     play_area.append(self._current_moves[row][col].label)
         return play_area
+    
+    # AIの入力用に状態を反転
+    def inverse_playarea(self, playarea):
+        playarea_inverse = []
+        for element in playarea:
+            if element == "×":
+                playarea_inverse.append("O")
+            elif element == "O":
+                playarea_inverse.append("×")
+            else:
+                playarea_inverse.append(element)
+        return playarea_inverse
 
 # ゲーム実行
 def main():

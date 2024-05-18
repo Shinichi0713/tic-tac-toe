@@ -58,7 +58,7 @@ class Agent:
         return row_index
     
     # greedy法による行動選択
-    def get_ql_action(self, play_area, choosable_area, epsilon):
+    def choice_q_action(self, play_area, choosable_area, epsilon):
         ai_input = None
         # esilonの確率でランダムな選択をする
         if np.random.rand() < epsilon:
@@ -67,23 +67,45 @@ class Agent:
         else:
             row_index = self._find_q_row(play_area)
             first_choice_flg = 1
+            q_max = -9999
             for choice in choosable_area:
                 if first_choice_flg == 1:
-                    ai_input = int(choice)
                     first_choice_flg = 0
+                    q_max = self.q_table[row_index, int(choice)-1]
                 else:
-                    if self.q_table[row_index, ai_input-1] \
-                    < self.q_table[row_index, int(choice)-1]:
-                        ai_input = int(choice)
+                    if q_max < self.q_table[row_index, int(choice)-1]:
+                        q_max = self.q_table[row_index, int(choice)-1]
+            # Q値の最大値を持つ行動のインデックスを格納
+            actions_candidate = [choice for choice in choosable_area if q_max == self.q_table[row_index, int(choice)-1]]
+            ai_input = int(random.choice(actions_candidate))
         # AI入力が得られない場合、ランダムに選択
         if ai_input is None:
             ai_input = int(random.choice(choosable_area))
         return ai_input
     
+    # AIの行動を取得、行動ラベル出力
+    def get_ai_input(self, play_area, first_inputter, mode=0, epsilon=None):
+        choosable_area = [str(area) for area in play_area if type(area) is int]
+        # ランダム行動
+        if mode == 0:
+            ai_input = int(random.choice(choosable_area))
+        # Qテーブルベース行動
+        elif mode == 1:
+            ai_input = self.choice_q_action(play_area, choosable_area, epsilon)
+        
+        # 学習時は必要、対戦段階では不要
+        if first_inputter == 1:
+            play_area[play_area.index(ai_input)] = self.game.symbol_player[0]
+        elif first_inputter == 2:
+            play_area[play_area.index(ai_input)] = self.game.symbol_player[1]
+        
+        return play_area, ai_input
+
     # Q学習実行
     def train_qtable(self, first_inputter, epsilon=0):
         # Q学習退避用
         ql_input_list = []
+        # 状態量の変数
         play_area_list = []
 
         play_area = list(range(1, 10))
@@ -94,7 +116,7 @@ class Agent:
         result = 0  # 0:引き分け, 1:AI(1)勝利, 2:AI(2)勝利
         # 1ゲームの実行
         while True:
-            # Q学習退避用
+            # Q学習状態量履歴
             play_area_tmp = play_area.copy()
             play_area_list.append(play_area_tmp)
             # Q学習実行フラグ
@@ -111,7 +133,7 @@ class Agent:
                 end_flg = not self.game.is_tied() or winner
                 # Q学習退避用
                 ql_input_list.append(ql_ai_input)            
-                # 勝利した場合
+                # AIが勝利した場合
                 if winner:
                     reward = 4
                     ql_flg = 1
@@ -126,11 +148,10 @@ class Agent:
                 self.game.calculate_hand(random_ai_input - 1)
                 winner = self.game.has_winner()
                 end_flg = not self.game.is_tied() or winner
-                # AI(ランダム)が先手の場合の初手以外は学習
-                if inputter_count != 1:
-                    ql_flg = 1
+                # AIが負けた場合
                 if winner:
                     reward = -1
+                    ql_flg = 1
                     result = 2
             # Q学習実行
             if ql_flg == 1:
@@ -139,48 +160,36 @@ class Agent:
                                 reward, play_area, end_flg)
             # ゲーム終了
             if end_flg:
+                # ゲーム初期化
+                self.game.reset_game()
                 break
             inputter_count += 1
         return winner, self.q_table, result
     
-    # AIの行動を取得、行動ラベル出力
-    def get_ai_input(self, play_area, first_inputter, mode=0, epsilon=None):
-        choosable_area = [str(area) for area in play_area if type(area) is int]
-        # ランダム行動
-        if mode == 0:
-            ai_input = int(random.choice(choosable_area))
-        # Qテーブルベース行動
-        elif mode == 1:
-            ai_input = self.get_ql_action(play_area, choosable_area, epsilon)
-        
-        # 学習時は必要、対戦段階では不要
-        if first_inputter == 1:
-            play_area[play_area.index(ai_input)] = self.game.symbol_player[0]
-        elif first_inputter == 2:
-            play_area[play_area.index(ai_input)] = self.game.symbol_player[1]
-        
-        return play_area, ai_input
 
 # エージェントを学習
 def train_agent():
     game = tic_tac_toe.TicTacToeGame()
     agent = Agent(game=game)
     epoch = 100000
-    epsiron = 0.0
+    epsiron = 0.0   # ε-greedy法の閾値
     interval = epoch // 10
     count_ai_win = 0
+    count_ai_lose = 0
     for i in range(epoch):
         winner, q_table, result = agent.train_qtable(1, epsiron)
         if i % interval == 0:
             print(f'Epoch: {i}, Winner: {winner}')
         if winner:
             epsiron = epsiron * 0.9
-        if result == 2:
+        if result == 1:
             count_ai_win += 1
+        elif result == 2:
+            count_ai_lose += 1
     # Qテーブル保存
     np.save(filename_q_table, q_table)
     print('Save Q table')
-    print(q_table.sum(), epsiron, count_ai_win)
+    print(q_table.sum(), epsiron, count_ai_win, count_ai_lose)
     return winner, q_table
 
 if __name__ == "__main__":
