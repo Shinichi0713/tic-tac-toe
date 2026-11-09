@@ -3,6 +3,7 @@
 // Module: cordic
 // Description: Pipelined CORDIC for atan2, sqrt, sin, cos
 //              Uses Q16.16 fixed-point.
+// Modes:
 //   mode=0: Vectoring -> computes r = sqrt(x^2+y^2) and atan2(y,x)
 //   mode=1: Rotation  -> computes (x*cos(z) - y*sin(z), x*sin(z) + y*cos(z))
 // Latency = NUM_ITER + 2 cycles
