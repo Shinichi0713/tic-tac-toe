@@ -116,4 +116,79 @@ module robot_controller #(
             status_led  <= 1'b0;
         end else begin
             led_counter <= led_counter + 25'd1;
-            if (led_counter == (CLK_FREQ_HZ/2 - 1)) b
+            if (led_counter == (CLK_FREQ_HZ/2 - 1)) begin // 0.5Hz点滅
+                led_counter <= 25'd0;
+                status_led  <= ~status_led;
+            end
+        end
+    end
+
+    // UART TX は現在未使用（エコーバックなどに拡張可能）
+    assign uart_tx = 1'b1;
+
+endmodule
+
+
+//////////////////////////////////////////////////////////////////////////////
+// UART受信モジュール (8N1)
+//////////////////////////////////////////////////////////////////////////////
+module uart_rx #(
+    parameter CLK_FREQ_HZ = 50_000_000,
+    parameter BAUDRATE    = 115200
+)(
+    input  logic        clk,
+    input  logic        rst_n,
+    input  logic        rx_pin,
+    output logic [7:0]  rx_data,
+    output logic        rx_valid
+);
+
+    localparam BIT_PERIOD = CLK_FREQ_HZ / BAUDRATE;
+
+    typedef enum logic [2:0] {
+        IDLE,
+        START_BIT,
+        DATA_BITS,
+        STOP_BIT,
+        DONE
+    } state_t;
+
+    state_t state;
+    logic [15:0]  baud_counter;
+    logic [2:0]   bit_index;
+    logic [7:0]   rx_shift_reg;
+    logic         rx_sync, rx_sync2;
+
+    // メタステーブル対策の2段同期
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            rx_sync  <= 1'b1;
+            rx_sync2 <= 1'b1;
+        end else begin
+            rx_sync  <= rx_pin;
+            rx_sync2 <= rx_sync;
+        end
+    end
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            state         <= IDLE;
+            baud_counter  <= 16'd0;
+            bit_index     <= 3'd0;
+            rx_shift_reg  <= 8'd0;
+            rx_data       <= 8'd0;
+            rx_valid      <= 1'b0;
+        end else begin
+            rx_valid <= 1'b0; // デフォルトで無効
+
+            case (state)
+                IDLE: begin
+                    baud_counter <= 16'd0;
+                    bit_index    <= 3'd0;
+                    if (rx_sync2 == 1'b0) begin // スタートビット検出
+                        state <= START_BIT;
+                    end
+                end
+
+                START_BIT: begin
+                    if (baud_counte
