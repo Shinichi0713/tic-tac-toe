@@ -191,4 +191,33 @@ module uart_rx #(
                 end
 
                 START_BIT: begin
-                    if (baud_counte
+                    if (baud_counter == (BIT_PERIOD / 2)) begin
+                        if (rx_sync2 == 1'b0) begin // 確認
+                            baud_counter <= 16'd0;
+                            state        <= DATA_BITS;
+                        end else begin
+                            state <= IDLE;
+                        end
+                    end else begin
+                        baud_counter <= baud_counter + 16'd1;
+                    end
+                end
+
+                DATA_BITS: begin
+                    if (baud_counter == (BIT_PERIOD - 1)) begin
+                        baud_counter <= 16'd0;
+                        rx_shift_reg <= {rx_sync2, rx_shift_reg[7:1]};
+                        if (bit_index == 3'd7) begin
+                            state <= STOP_BIT;
+                        end else begin
+                            bit_index <= bit_index + 3'd1;
+                        end
+                    end else begin
+                        baud_counter <= baud_counter + 16'd1;
+                    end
+                end
+
+                STOP_BIT: begin
+                    if (baud_counter == (BIT_PERIOD - 1)) begin
+                        rx_data  <= rx_shift_reg;
+           
