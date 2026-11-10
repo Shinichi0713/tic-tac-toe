@@ -220,4 +220,54 @@ module uart_rx #(
                 STOP_BIT: begin
                     if (baud_counter == (BIT_PERIOD - 1)) begin
                         rx_data  <= rx_shift_reg;
-           
+                        rx_valid <= 1'b1;
+                        state    <= IDLE;
+                    end else begin
+                        baud_counter <= baud_counter + 16'd1;
+                    end
+                end
+
+                default: state <= IDLE;
+            endcase
+        end
+    end
+
+endmodule
+
+
+//////////////////////////////////////////////////////////////////////////////
+// PWM生成モジュール (8bit分解能, 0-255)
+//////////////////////////////////////////////////////////////////////////////
+module pwm_generator #(
+    parameter CLK_FREQ_HZ = 50_000_000,
+    parameter PWM_FREQ_HZ = 20_000
+)(
+    input  logic        clk,
+    input  logic        rst_n,
+    input  logic [7:0]  duty,
+    output logic        pwm_out
+);
+
+    localparam PWM_PERIOD = CLK_FREQ_HZ / PWM_FREQ_HZ / 256;
+    
+    logic [15:0] prescaler;
+    logic [7:0]  counter;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            prescaler <= 16'd0;
+            counter   <= 8'd0;
+            pwm_out   <= 1'b0;
+        end else begin
+            if (prescaler == (PWM_PERIOD - 1)) begin
+                prescaler <= 16'd0;
+                counter   <= counter + 8'd1;
+            end else begin
+                prescaler <= prescaler + 16'd1;
+            end
+            
+            pwm_out <= (counter < duty);
+        end
+    end
+
+endmodule
